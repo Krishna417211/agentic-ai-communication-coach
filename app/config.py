@@ -29,13 +29,18 @@ class Settings(BaseSettings):
     groq_base_url: str = "https://api.groq.com/openai/v1"
 
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.6-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
+    # Gemini 3.x reasons before answering, and those tokens are billed against
+    # max_tokens. "low" keeps the pipeline responsive (~3s vs ~12s per call)
+    # and is ample for classification and structured rewriting. Use "high" for
+    # more deliberation, or "" to send no thinkingConfig at all.
+    gemini_thinking_level: str = "low"
 
     llm_timeout_seconds: float = 45.0
     llm_max_retries: int = 2
     llm_temperature: float = 0.4
-    llm_max_tokens: int = 1600
+    llm_max_tokens: int = 3000
 
     # --- Memory -------------------------------------------------------
     memory_max_turns: int = 12

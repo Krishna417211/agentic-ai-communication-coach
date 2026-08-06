@@ -9,7 +9,13 @@ from __future__ import annotations
 
 import re
 
-_QUOTED_RE = re.compile(r"[\"“']{1,3}(.{25,}?)[\"”']{1,3}", re.DOTALL)
+# Double quotes are unambiguous. Single quotes are NOT: in ordinary English
+# prose the apostrophes in "my teammate's ... it's upsetting" would otherwise
+# be read as a quote pair, capturing the text between them as a draft. So a
+# single quote only opens a quotation at a word boundary and only closes at
+# one, which apostrophes inside words can never satisfy.
+_DOUBLE_QUOTED_RE = re.compile(r"[\"“](.{25,}?)[\"”]", re.DOTALL)
+_SINGLE_QUOTED_RE = re.compile(r"(?:^|\s)'(.{25,}?)'(?=[\s.,!?;:]|$)", re.DOTALL)
 _LEAD_IN_RE = re.compile(
     r"(?:here'?s|this is|below is|check|review|fix|improve|rewrite|proofread|"
     r"look at|my draft|i wrote|i said|it says|feedback on)\b[^:\n]{0,60}[:\n]",
@@ -52,11 +58,12 @@ _SYNONYM_TONE = {
 
 def extract_target_text(message: str) -> str:
     """Return the draft embedded in `message`, or "" if it is all instruction."""
-    quoted = _QUOTED_RE.search(message)
-    if quoted:
-        candidate = quoted.group(1).strip()
-        if len(candidate.split()) >= 5:
-            return candidate
+    for pattern in (_DOUBLE_QUOTED_RE, _SINGLE_QUOTED_RE):
+        quoted = pattern.search(message)
+        if quoted:
+            candidate = quoted.group(1).strip()
+            if len(candidate.split()) >= 5:
+                return candidate
 
     lead_in = _LEAD_IN_RE.search(message)
     if lead_in:

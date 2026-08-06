@@ -79,13 +79,21 @@ Then set **one** of these in `.env`:
 | **Google Gemini** | Free tier, no card | <https://aistudio.google.com/apikey> |
 
 ```dotenv
-GROQ_API_KEY=gsk_...
+GEMINI_API_KEY=<your key>
+GEMINI_MODEL=gemini-3.6-flash
 # or
-GEMINI_API_KEY=AIza...
+GROQ_API_KEY=gsk_...
 ```
 
 `LLM_PROVIDER=auto` (the default) picks whichever key is present, preferring
-Groq, and falls back to the rule-based engine if neither is set.
+Groq, and falls back to the rule-based engine if neither is set. Set
+`LLM_PROVIDER=gemini` to pin it explicitly.
+
+> **Note on Gemini 3.x:** these models reason before answering, and those
+> reasoning tokens are billed against `LLM_MAX_TOKENS`. The default of 3000
+> leaves ample room; if you lower it, a long request can exhaust the budget
+> during reasoning and return no answer. The provider detects that case and
+> reports it rather than failing silently.
 
 ### Run it with Docker
 
@@ -420,7 +428,7 @@ the full list.
 | `GROQ_API_KEY` | — | Free tier at console.groq.com |
 | `GROQ_MODEL` | `llama-3.3-70b-versatile` | |
 | `GEMINI_API_KEY` | — | Free tier at aistudio.google.com |
-| `GEMINI_MODEL` | `gemini-2.0-flash` | |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | |
 | `LLM_TIMEOUT_SECONDS` | `45` | |
 | `LLM_MAX_RETRIES` | `2` | Exponential backoff on 429/5xx |
 | `MEMORY_MAX_TURNS` | `12` | Turns kept before summarising |
@@ -483,6 +491,22 @@ that sleeps. An embedding index would be heavier for no measurable gain here.
 **Why in-memory sessions?** The spec asks for short-term conversational memory,
 and a free-tier host runs one worker. The store is deliberately narrow — three
 methods — so moving to Redis is a contained change rather than a rewrite.
+
+**Free-tier quota is the real constraint.** Gemini's free tier caps requests
+*per day per model* (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`). A full
+coaching turn chains up to five LLM calls, so the daily cap arrives quickly under
+testing. The provider distinguishes a burst rate-limit (retried with backoff)
+from an exhausted daily cap (fails straight through to the rule engine rather
+than burning seconds on a wall it cannot get past). When the cap is hit the app
+keeps answering — degraded, and it says so.
+
+**Latency.** With a reasoning model, a turn that runs the full chain
+(tone → rewrite → score → synthesis) takes 30-90s; one that skips the rewrite
+takes ~10s. `GEMINI_THINKING_LEVEL=low` is the default because it cuts per-call
+latency roughly 4x with no quality loss on these tasks. The steps are genuinely
+sequential — the rewriter consumes the tone analysis, the scorer consumes the
+rewrite — so the remaining win would be running tone analysis and the initial
+scoring concurrently.
 
 **Known limitations.** Sessions are per-process, so horizontal scaling needs the
 Redis swap. The rule-based rewriter is a transformation, not a generator — with

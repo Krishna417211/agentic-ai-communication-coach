@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 import uuid
 from typing import Any
@@ -239,13 +240,28 @@ _DRAFT_HINTS = (
     Intent.CUSTOMER_COMMUNICATION,
 )
 
+#: Someone asking the coach for advice is not handing over a draft. Rewriting
+#: their question produces an "improved version" that is just their question
+#: back, which is worse than useless.
+_ADVICE_QUESTION_RE = re.compile(
+    r"\b(?:how (?:do|should|can|would) i|what (?:should|do) i|"
+    r"how (?:can|do) you|any (?:tips|advice|suggestions)|"
+    r"what'?s the best way|should i|is it (?:ok|okay|better)|"
+    r"can you (?:help|teach|explain|walk)|how to)\b",
+    re.IGNORECASE,
+)
+
 
 def _looks_like_a_draft(message: str, intent: Intent) -> bool:
     """Decide whether the message body is itself the text to work on.
 
     Long messages, or messages for intents that presuppose existing text, are
-    treated as drafts even when no explicit quoting was detected.
+    treated as drafts even when no explicit quoting was detected — unless the
+    message is the user asking the coach a question about their situation.
     """
+    if _ADVICE_QUESTION_RE.search(message):
+        return False
+
     words = len(message.split())
     if words >= 45:
         return True

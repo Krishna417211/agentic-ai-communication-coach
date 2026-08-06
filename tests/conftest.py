@@ -3,12 +3,23 @@
 from __future__ import annotations
 
 import json
+import os
+
+# Force the offline provider before anything reads settings. Without this a
+# developer's real .env would make the suite issue live API calls: slow,
+# rate-limited, non-deterministic and dependent on someone's quota. LLM paths
+# are covered by FakeLLM below instead. Set TEST_LLM_PROVIDER to override.
+os.environ["LLM_PROVIDER"] = os.getenv("TEST_LLM_PROVIDER", "heuristic")
+os.environ["LOG_FILE"] = ""
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.config import get_settings
 from app.llm.base import LLMError, LLMProvider
 from app.main import create_app
+
+get_settings.cache_clear()
 
 
 class FakeLLM(LLMProvider):

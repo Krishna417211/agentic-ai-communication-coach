@@ -199,7 +199,7 @@ Return JSON:
             prompt,
             system="You are a planning module. You output only valid JSON.",
             temperature=0.2,
-            max_tokens=700,
+            max_tokens=1500,
         )
 
         steps: list[PlanStep] = []

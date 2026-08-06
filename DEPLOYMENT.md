@@ -23,7 +23,7 @@ Neither requires a credit card.
 | Provider | Console | Notes |
 |---|---|---|
 | **Groq** (recommended) | <https://console.groq.com/keys> | Fastest inference; default model `llama-3.3-70b-versatile` |
-| **Google Gemini** | <https://aistudio.google.com/apikey> | Default model `gemini-2.0-flash` |
+| **Google Gemini** | <https://aistudio.google.com/apikey> | Default model `gemini-3.6-flash` |
 
 The app deploys and runs without a key — it falls back to the rule-based engine
 — but generated drafts and conversational coaching need one.

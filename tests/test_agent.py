@@ -272,6 +272,28 @@ class TestOrchestrator:
         assert response.coaching_message
         assert response.overall_score is not None
 
+    async def test_advice_questions_are_not_rewritten_as_drafts(self):
+        # Rewriting the user's own question hands back an "improved version"
+        # that is just their question again — worse than offering nothing.
+        agent = await self._agent()
+        response = await agent.run(
+            "My teammate's code review comments come across as dismissive and "
+            "it's upsetting the junior devs. How do I raise it without starting "
+            "a fight?"
+        )
+        assert response.intent.intent == Intent.CONFLICT_RESOLUTION
+        assert ToolName.CONVERSATION_IMPROVEMENT not in response.tools_used
+        assert response.improved_response is None
+
+    async def test_a_real_draft_is_still_rewritten(self):
+        agent = await self._agent()
+        response = await agent.run(
+            'Can you fix this: "You never send the numbers on time. This is '
+            'unacceptable and its obviously your fault."'
+        )
+        assert ToolName.CONVERSATION_IMPROVEMENT in response.tools_used
+        assert response.improved_response
+
     async def test_scores_are_reproducible(self, sample_email):
         agent = await self._agent()
         first = await agent.run(sample_email)
@@ -296,6 +318,102 @@ class TestOrchestrator:
             assert response.plan.steps, message
 
 
+class TestGeminiQuotaHandling:
+    """A 429 is not one condition: a burst limit clears, a daily cap does not."""
+
+    @staticmethod
+    def _response(violations: list[str], retry_delay: str | None):
+        import httpx
+
+        details: list[dict] = [
+            {
+                "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                "violations": [{"quotaId": q} for q in violations],
+            }
+        ]
+        if retry_delay is not None:
+            details.append(
+                {"@type": "type.googleapis.com/google.rpc.RetryInfo",
+                 "retryDelay": retry_delay}
+            )
+        return httpx.Response(
+            429,
+            json={"error": {"details": details}},
+            request=httpx.Request("POST", "http://example.invalid"),
+        )
+
+    def test_daily_quota_is_not_retryable(self):
+        from app.llm.gemini_provider import _parse_quota_error
+
+        delay, quota_ids = _parse_quota_error(
+            self._response(["GenerateRequestsPerDayPerProjectPerModel-FreeTier"], "34s")
+        )
+        # Even though Google advertises 34s, a per-day cap will not clear
+        # during this request — waiting only delays the rule-based fallback.
+        assert delay is None
+        assert any("PerDay" in q for q in quota_ids)
+
+    def test_per_minute_quota_is_retryable(self):
+        from app.llm.gemini_provider import _MAX_RETRY_DELAY_SECONDS, _parse_quota_error
+
+        delay, _ = _parse_quota_error(
+            self._response(["GenerateRequestsPerMinutePerProjectPerModel-FreeTier"], "4s")
+        )
+        assert delay == 4.0
+        assert delay <= _MAX_RETRY_DELAY_SECONDS
+
+    def test_unparsable_body_does_not_crash(self):
+        import httpx
+
+        from app.llm.gemini_provider import _parse_quota_error
+
+        response = httpx.Response(
+            429, text="<html>gateway</html>",
+            request=httpx.Request("POST", "http://example.invalid"),
+        )
+        assert _parse_quota_error(response) == (None, [])
+
+
+class TestGeminiThinkingModels:
+    """Gemini 3.x bills reasoning tokens against maxOutputTokens."""
+
+    def test_thought_parts_are_excluded_from_the_answer(self):
+        from app.llm.gemini_provider import _first_text
+
+        data = {
+            "candidates": [
+                {
+                    "finishReason": "STOP",
+                    "content": {
+                        "parts": [
+                            {"text": "Let me reason about this...", "thought": True},
+                            {"text": '{"intent":"email_writing"}'},
+                        ]
+                    },
+                }
+            ]
+        }
+        assert _first_text(data) == '{"intent":"email_writing"}'
+
+    def test_budget_exhausted_by_reasoning_is_reported_clearly(self):
+        from app.llm.base import LLMError
+        from app.llm.gemini_provider import _first_text
+
+        data = {
+            "candidates": [{"finishReason": "MAX_TOKENS", "content": {"parts": []}}],
+            "usageMetadata": {"thoughtsTokenCount": 385},
+        }
+        with pytest.raises(LLMError, match="maxOutputTokens"):
+            _first_text(data)
+
+    def test_token_budget_has_a_floor(self):
+        from app.llm.gemini_provider import GeminiProvider
+
+        # A caller asking for 400 tokens on a thinking model would get
+        # truncated reasoning instead of an answer.
+        assert GeminiProvider.MIN_OUTPUT_TOKENS >= 1200
+
+
 class TestJsonRepair:
     @pytest.mark.parametrize(
         "raw",
@@ -313,3 +431,26 @@ class TestJsonRepair:
     def test_returns_none_for_garbage(self):
         assert extract_json("no json here at all") is None
         assert extract_json("") is None
+
+
+class TestApostropheHandling:
+    """Apostrophes are not quotation marks."""
+
+    def test_apostrophes_are_not_read_as_a_quoted_draft(self):
+        message = (
+            "My teammate's code review comments come across as dismissive and "
+            "it's upsetting the junior devs."
+        )
+        assert extract_target_text(message) == ""
+
+    def test_single_quoted_draft_is_still_extracted(self):
+        message = "Fix this please: 'their going to the meeting tommorow and its late'"
+        assert "their going" in extract_target_text(message)
+
+    def test_double_quoted_draft_is_still_extracted(self):
+        message = 'Fix this: "their going to the meeting tommorow and its late"'
+        assert "their going" in extract_target_text(message)
+
+    def test_contraction_heavy_text_is_untouched(self):
+        message = "I can't tell if it's rude, don't you think they're being harsh?"
+        assert extract_target_text(message) == ""

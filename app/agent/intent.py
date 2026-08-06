@@ -65,7 +65,9 @@ _PATTERNS: dict[Intent, list[tuple[str, float]]] = {
     ],
     Intent.CONFLICT_RESOLUTION: [
         (r"\bconflict\b", 3.5), (r"\bargument\b", 3.0), (r"\bdisagree\w*\b", 3.0),
-        (r"\bconfront\w*\b", 3.0), (r"\bupset\b", 2.0), (r"\bangry\b", 2.5),
+        (r"\bconfront\w*\b", 3.0), (r"\bupset\w*\b", 2.0), (r"\bangry\b", 2.5),
+        (r"\bstart(?:ing)? a fight\b", 3.5), (r"\bdismissive\b", 2.5),
+        (r"\bcondescending\b", 2.5), (r"\bdefensive\b", 2.0),
         (r"\bdifficult conversation\b", 3.5), (r"\btension\b", 2.5),
         (r"\bpush(?:ing)? back\b", 2.0), (r"\bmy (?:boss|manager) (?:is|keeps|won't)\b", 2.0),
         (r"\bblam\w+\b", 2.5), (r"\bfrustrated with\b", 2.5),
@@ -177,7 +179,7 @@ Return JSON:
             prompt,
             system="You are an intent classifier. You output only valid JSON.",
             temperature=0.0,
-            max_tokens=400,
+            max_tokens=1200,
         )
 
         raw_intent = str(data.get("intent", "")).strip().lower()

@@ -14,7 +14,11 @@ import streamlit as st
 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
 API = f"{API_BASE}/api/v1"
-TIMEOUT = float(os.getenv("UI_TIMEOUT_SECONDS", "90"))
+# A full coaching turn chains up to four LLM calls plus synthesis. On a free
+# tier with a reasoning model that legitimately exceeds 90s, so the client
+# timeout has to be generous or the UI aborts a request that was going to
+# succeed.
+TIMEOUT = float(os.getenv("UI_TIMEOUT_SECONDS", "240"))
 
 st.set_page_config(
     page_title="AI Communication Coach",
@@ -255,6 +259,10 @@ with chat_tab:
             )
             if error:
                 st.error(error)
+                # Drop the orphaned user turn and do NOT rerun: a rerun would
+                # wipe this error off the screen, and the turn would vanish
+                # with no explanation of what went wrong.
+                st.session_state.messages.pop()
             else:
                 st.session_state.session_id = payload["session_id"]
                 st.session_state.last_payload = payload
@@ -262,7 +270,7 @@ with chat_tab:
                     {"role": "assistant", "payload": payload}
                 )
                 render_coaching(payload)
-        st.rerun()
+                st.rerun()
 
 
 with analyze_tab:

@@ -38,6 +38,7 @@ def build_provider(settings: Settings) -> LLMProvider:
             max_retries=settings.llm_max_retries,
             default_temperature=settings.llm_temperature,
             default_max_tokens=settings.llm_max_tokens,
+            thinking_level=settings.gemini_thinking_level,
         )
 
     if choice in ("groq", "gemini"):
