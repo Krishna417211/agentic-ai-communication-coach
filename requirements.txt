@@ -1,0 +1,22 @@
+# Web framework
+fastapi==0.141.1
+uvicorn[standard]==0.52.1
+python-multipart==0.0.32
+
+# Config & validation
+pydantic==2.13.4
+pydantic-settings==2.14.2
+python-dotenv==1.2.2
+
+# HTTP client (LLM providers + UI -> API)
+httpx==0.28.1
+
+# PDF resume parsing
+pypdf==6.14.2
+
+# UI
+streamlit==1.61.1
+
+# Tests
+pytest==9.1.1
+pytest-asyncio==1.4.0

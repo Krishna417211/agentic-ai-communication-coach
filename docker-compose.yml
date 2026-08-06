@@ -1,0 +1,52 @@
+services:
+  api:
+    build:
+      context: .
+      target: runtime
+    image: communication-training-agent:latest
+    container_name: cta-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Leave both keys unset to run the offline rule-based engine.
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_JSON: ${LOG_JSON:-true}
+      ENVIRONMENT: docker
+    # No `env_file` needed: Compose automatically reads a .env file in this
+    # directory for the ${VAR} substitutions above.
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "healthcheck.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: .
+      target: runtime
+    image: communication-training-agent:latest
+    container_name: cta-ui
+    ports:
+      - "8501:8501"
+    environment:
+      # Service name resolution inside the compose network.
+      API_BASE_URL: http://api:8000
+    command: >
+      streamlit run ui/streamlit_app.py
+      --server.port=8501
+      --server.address=0.0.0.0
+      --server.headless=true
+      --browser.gatherUsageStats=false
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped

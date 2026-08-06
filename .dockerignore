@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.git/
+.gitignore
+logs/
+*.log
+.env
+tests/
+.ruff_cache/
+htmlcov/
+.coverage
+README.md
+DEPLOYMENT.md

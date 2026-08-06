@@ -1,0 +1,23 @@
+# One-click deploy config for Render (https://render.com).
+# The free plan sleeps after 15 minutes of inactivity; the first request
+# afterwards takes ~30-50s to wake the container.
+services:
+  - type: web
+    name: communication-training-agent
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: LLM_PROVIDER
+        value: auto
+      - key: GROQ_API_KEY
+        sync: false        # set this in the Render dashboard
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LOG_JSON
+        value: "true"
+      - key: LOG_FILE
+        value: ""          # log to stdout only; Render's disk is ephemeral
+      - key: ENVIRONMENT
+        value: production
