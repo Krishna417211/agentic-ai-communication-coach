@@ -2,30 +2,95 @@
 
 Talks to the FastAPI service over HTTP — it holds no agent logic of its own, so
 what you see in the UI is exactly what an API consumer would get.
+
+Two deployment shapes are supported:
+
+* **Split** (docker compose, or UI on Streamlit Cloud + API on Render): set
+  `API_BASE_URL` to the API's address and this file is a thin HTTP client.
+* **Standalone** (Streamlit Community Cloud on its own): with no
+  `API_BASE_URL` set and nothing already serving locally, the UI starts the
+  FastAPI app in a background thread and talks to it over loopback. Streamlit
+  Cloud only runs one process, so without this the deployed page would have no
+  backend to call. The UI still speaks HTTP, so both shapes exercise exactly
+  the same API surface.
 """
 
 from __future__ import annotations
 
 import os
+import socket
+import threading
+import time
 from typing import Any
 
 import httpx
 import streamlit as st
 
-API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000").rstrip("/")
-API = f"{API_BASE}/api/v1"
-# A full coaching turn chains up to four LLM calls plus synthesis. On a free
-# tier with a reasoning model that legitimately exceeds 90s, so the client
-# timeout has to be generous or the UI aborts a request that was going to
-# succeed.
-TIMEOUT = float(os.getenv("UI_TIMEOUT_SECONDS", "240"))
 
+def _port_is_open(host: str, port: int, timeout: float = 0.4) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(timeout)
+        return sock.connect_ex((host, port)) == 0
+
+
+@st.cache_resource(show_spinner="Starting the coaching API…")
+def _start_embedded_api(port: int = 8000) -> str:
+    """Run the FastAPI app in a daemon thread and return its base URL.
+
+    Cached so Streamlit's per-interaction reruns don't spawn a second server.
+    """
+    import sys
+    from pathlib import Path
+
+    # Streamlit Cloud runs this file directly, so the repo root may not be on
+    # sys.path even though `app/` sits next to `ui/`.
+    root = Path(__file__).resolve().parent.parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+    import uvicorn
+
+    from app.main import create_app
+
+    server = uvicorn.Server(
+        uvicorn.Config(
+            create_app(), host="127.0.0.1", port=port, log_level="warning"
+        )
+    )
+    threading.Thread(target=server.run, daemon=True).start()
+
+    for _ in range(100):  # wait up to ~20s for startup
+        if _port_is_open("127.0.0.1", port):
+            break
+        time.sleep(0.2)
+    return f"http://127.0.0.1:{port}"
+
+
+def _resolve_api_base() -> str:
+    configured = os.getenv("API_BASE_URL")
+    if configured:
+        return configured.rstrip("/")
+    if _port_is_open("127.0.0.1", 8000):
+        return "http://127.0.0.1:8000"  # someone already runs the API locally
+    return _start_embedded_api()
+
+
+# set_page_config must precede every other Streamlit call, including the
+# cached starter's spinner — so it comes before the API base is resolved.
 st.set_page_config(
     page_title="AI Communication Coach",
     page_icon="🗣️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+API_BASE = _resolve_api_base()
+API = f"{API_BASE}/api/v1"
+# A full coaching turn chains up to four LLM calls plus synthesis. On a free
+# tier with a reasoning model that legitimately exceeds 90s, so the client
+# timeout has to be generous or the UI aborts a request that was going to
+# succeed.
+TIMEOUT = float(os.getenv("UI_TIMEOUT_SECONDS", "240"))
 
 
 # ---------------------------------------------------------------------------
