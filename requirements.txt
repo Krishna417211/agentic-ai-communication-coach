@@ -1,3 +1,6 @@
+# Runtime dependencies only — this file is what the Docker image installs.
+# Test-only packages live in requirements-dev.txt so they never ship to prod.
+
 # Web framework
 fastapi==0.141.1
 uvicorn[standard]==0.52.1
@@ -16,7 +19,3 @@ pypdf==6.14.2
 
 # UI
 streamlit==1.61.1
-
-# Tests
-pytest==9.1.1
-pytest-asyncio==1.4.0

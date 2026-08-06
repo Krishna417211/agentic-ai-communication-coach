@@ -46,7 +46,8 @@ Feedback & Improved Response
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt          # runtime only (what Docker installs)
+# pip install -r requirements-dev.txt    # runtime + pytest, to run the tests
 
 # Terminal 1 — API
 uvicorn app.main:app --reload
@@ -446,7 +447,8 @@ the full list.
 ## Testing
 
 ```bash
-pytest                      # 111 tests
+pip install -r requirements-dev.txt
+pytest                      # 123 tests
 pytest -v                   # verbose
 pytest tests/test_nlp.py    # one module
 ```
@@ -544,6 +546,7 @@ app/
 └── api/                    Routes and dependencies
 
 ui/streamlit_app.py         Streamlit UI
-tests/                      111 tests
-Dockerfile · docker-compose.yml · render.yaml · requirements.txt
+tests/                      123 tests
+Dockerfile · docker-compose.yml · render.yaml
+requirements.txt (runtime) · requirements-dev.txt (+ tests)
 ```

@@ -13,3 +13,4 @@ htmlcov/
 .coverage
 README.md
 DEPLOYMENT.md
+requirements-dev.txt
