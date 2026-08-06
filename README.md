@@ -1,5 +1,7 @@
 # End-to-End Agentic AI Communication Training Agent
 
+**Repository:** <https://github.com/Krishna417211/agentic-ai-communication-coach>
+
 An AI communication coach that reasons about what you need, plans a coaching
 workflow, selects its own tools, remembers the conversation, and returns
 personalised feedback with a scored improvement.

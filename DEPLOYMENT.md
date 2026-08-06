@@ -107,20 +107,46 @@ check your current allowance before relying on it for a long-lived demo.
 
 ## Deploying the UI
 
-### Streamlit Community Cloud (free)
+### Streamlit Community Cloud (free) — standalone, no separate API needed
 
-1. Go to <https://share.streamlit.io> and connect the same repository.
-2. **Main file path:** `ui/streamlit_app.py`
-3. **Advanced settings → Secrets**, point it at your deployed API:
+Streamlit Cloud runs a single process. The UI handles this: with no
+`API_BASE_URL` set it starts the FastAPI app in a background thread and talks
+to it over loopback, so one deployment gives you both the API and the UI.
+
+1. Go to <https://share.streamlit.io> and sign in with GitHub.
+2. **Create app → Deploy a public app from GitHub**.
+3. Fill in:
+   - **Repository:** `Krishna417211/agentic-ai-communication-coach`
+   - **Branch:** `main`
+   - **Main file path:** `ui/streamlit_app.py`
+4. **Advanced settings → Secrets**, paste (Streamlit exposes these as env vars):
 
    ```toml
-   API_BASE_URL = "https://<service-name>.onrender.com"
+   GEMINI_API_KEY = "your-key-here"
+   GEMINI_MODEL = "gemini-3.6-flash"
+   LLM_PROVIDER = "gemini"
+   LOG_FILE = ""
    ```
 
-   The UI reads `API_BASE_URL` from the environment, and Streamlit Cloud exposes
-   secrets as environment variables.
+   Omit the key entirely and the app still runs, on the rule-based engine.
 
-4. Deploy.
+5. **Deploy.** First build takes 2-5 minutes while it installs
+   `requirements.txt`.
+
+Your URL: `https://<app-name>.streamlit.app`
+
+> Never commit the key — `.env` is gitignored and `.env.example` ships blank.
+> Streamlit secrets are the right home for it.
+
+### Split deployment (API on Render, UI on Streamlit Cloud)
+
+Prefer this if you want a public REST API as well. Deploy the API to Render
+first, then add one more secret so the UI targets it instead of starting its
+own:
+
+```toml
+API_BASE_URL = "https://<service-name>.onrender.com"
+```
 
 ### Or run both on one host
 
