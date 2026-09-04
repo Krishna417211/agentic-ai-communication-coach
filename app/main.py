@@ -16,7 +16,6 @@ from app.agent.orchestrator import CommunicationAgent
 from app.api.routes import router
 from app.config import get_settings
 from app.llm.factory import build_provider
-from app.memory.profile import ProfileStore
 from app.memory.store import SessionStore
 from app.observability.logging_config import configure_logging
 from app.observability.metrics import metrics
@@ -47,7 +46,6 @@ async def lifespan(app: FastAPI):
     app.state.llm = llm
     app.state.registry = registry
     app.state.memory = memory
-    app.state.profiles = ProfileStore(settings.profile_db_path)
     app.state.agent = CommunicationAgent(
         llm=llm, registry=registry, memory=memory, settings=settings
     )

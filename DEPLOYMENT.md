@@ -126,16 +126,9 @@ to it over loopback, so one deployment gives you both the API and the UI.
    GEMINI_MODEL = "gemini-3.6-flash"
    LLM_PROVIDER = "gemini"
    LOG_FILE = ""
-   PROFILE_DB_PATH = "data/coach.db"
    ```
 
    Omit the key entirely and the app still runs, on the rule-based engine.
-
-   > **Progress data on Streamlit Cloud.** The container's filesystem is
-   > ephemeral: long-term progress survives while the app is warm and across
-   > reruns, but a reboot or redeploy wipes `data/coach.db`. That is fine for a
-   > demo. For progress that genuinely persists, point `PROFILE_DB_PATH` at a
-   > mounted volume on a host that has one (Render, Railway, a VPS).
 
 5. **Deploy.** First build takes 2-5 minutes while it installs
    `requirements.txt`.

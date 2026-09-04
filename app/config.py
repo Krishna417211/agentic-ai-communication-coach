@@ -43,9 +43,6 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 3000
 
     # --- Memory -------------------------------------------------------
-    #: Long-term coaching history. Short-term turns stay in memory; only
-    #: derived signal (scores, intents, issue labels) is written here.
-    profile_db_path: str = "data/coach.db"
     memory_max_turns: int = 12
     memory_summary_after: int = 8
     session_ttl_seconds: int = 60 * 60 * 6

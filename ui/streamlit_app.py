@@ -226,7 +226,6 @@ def render_coaching(payload: dict) -> None:
 st.session_state.setdefault("session_id", None)
 st.session_state.setdefault("messages", [])
 st.session_state.setdefault("last_payload", None)
-st.session_state.setdefault("handle", "")
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +236,7 @@ with st.sidebar:
     st.title("🗣️ Communication Coach")
     st.caption(
         "For early-career professionals who want to stop sounding junior in "
-        "writing — and to see it happening."
+        "writing."
     )
 
     health = get_health()
@@ -253,36 +252,6 @@ with st.sidebar:
                 "No LLM key configured — running the rule-based engine. "
                 "Analysis and scoring are fully available; generated drafts are not."
             )
-
-    st.divider()
-
-    # Identity is what turns a chat into coaching: without it every visit
-    # starts from zero and the agent can only ever react to one message.
-    st.caption("Who's practising?")
-    handle = st.text_input(
-        "Handle",
-        value=st.session_state.handle,
-        max_chars=32,
-        placeholder="e.g. krishna",
-        label_visibility="collapsed",
-        help=(
-            "Pick any name. Your scores and habits are saved under it so the "
-            "coach can track whether you're improving across sessions. Only "
-            "scores and habit labels are stored — never your messages."
-        ),
-    )
-    if handle != st.session_state.handle:
-        st.session_state.handle = handle
-        st.rerun()
-
-    if st.session_state.handle:
-        progress, _ = call_api("GET", f"/progress/{st.session_state.handle}")
-        if progress and progress["turns"]:
-            st.caption(f"**{progress['turns']}** turns coached · {progress['trend']}")
-        else:
-            st.caption("No history yet — your first turn starts the record.")
-    else:
-        st.info("Add a handle to track your progress over time.", icon="📈")
 
     st.divider()
     st.caption("This session")
@@ -328,10 +297,9 @@ with st.sidebar:
 # and resume tools, so each pair sits behind a single goal-shaped tab. The
 # containers are created here and filled further down, which keeps the section
 # bodies flat and in reading order.
-chat_tab, progress_tab, toolkit_tab, prep_tab, internals_tab = st.tabs(
+chat_tab, toolkit_tab, prep_tab, internals_tab = st.tabs(
     [
         "💬 Coach",
-        "📈 Your progress",
         "🔍 Analyze & rewrite",
         "🎯 Interview prep",
         "⚙️ Under the hood",
@@ -347,116 +315,11 @@ with prep_tab:
 metrics_tab = internals_tab
 
 
-with progress_tab:
-    st.subheader("Your progress")
-    st.caption(
-        "The part a chatbot can't do: what you keep getting wrong, and whether "
-        "you're fixing it."
-    )
-
-    if not st.session_state.handle:
-        st.info(
-            "Add a handle in the sidebar to start tracking. Every coached "
-            "message then counts towards your score history and habit list.",
-            icon="👈",
-        )
-    else:
-        progress, error = call_api("GET", f"/progress/{st.session_state.handle}")
-        if error:
-            st.error(error)
-        elif not progress or not progress["turns"]:
-            st.info(
-                f"Nothing recorded for **{st.session_state.handle}** yet. "
-                "Coach a message and it will show up here.",
-                icon="📭",
-            )
-        else:
-            top = st.columns(4)
-            top[0].metric("Messages coached", progress["turns"])
-            top[1].metric(
-                "Latest score",
-                f"{progress['latest_score']}/100"
-                if progress["latest_score"] is not None
-                else "—",
-                delta=progress["delta"],
-            )
-            top[2].metric(
-                "Average",
-                f"{progress['average_score']}"
-                if progress["average_score"] is not None
-                else "—",
-            )
-            top[3].metric(
-                "Best",
-                f"{progress['best_score']}"
-                if progress["best_score"] is not None
-                else "—",
-            )
-
-            st.caption(f"Overall: **{progress['trend']}**")
-
-            if len(progress["scores"]) >= 2:
-                st.markdown("#### Score over time")
-                st.line_chart(
-                    {"score": progress["scores"]},
-                    height=220,
-                    y_label="score / 100",
-                    x_label="coached message",
-                )
-            elif progress["scores"]:
-                st.caption("One more coached message and a trend line appears here.")
-
-            left, right = st.columns(2)
-            with left:
-                st.markdown("#### 🔧 Habits to work on")
-                if progress["top_habits"]:
-                    for habit in progress["top_habits"]:
-                        st.write(f"- **{habit['habit']}** — {habit['count']}x")
-                else:
-                    st.caption(
-                        "No repeated habits yet. A weakness has to show up "
-                        "twice before it counts as a pattern."
-                    )
-            with right:
-                st.markdown("#### ✅ Habits you're fixing")
-                if progress["fixed_habits"]:
-                    for habit in progress["fixed_habits"]:
-                        st.write(
-                            f"- **{habit['habit']}** — {habit['was']}x early, "
-                            f"now {habit['now']}x"
-                        )
-                else:
-                    st.caption(
-                        "Needs at least 6 coached messages before this can say "
-                        "anything honest."
-                    )
-
-            if progress["intents"]:
-                st.markdown("#### What you practise most")
-                st.bar_chart(
-                    {
-                        i["intent"].replace("_", " "): i["count"]
-                        for i in progress["intents"]
-                    },
-                    height=200,
-                    horizontal=True,
-                )
-
-            with st.expander("Manage this profile"):
-                st.caption(
-                    "Stored: scores, intents and habit labels. Never the text "
-                    "of your messages."
-                )
-                if st.button("🗑️ Delete my history", type="secondary"):
-                    call_api("DELETE", f"/progress/{st.session_state.handle}")
-                    st.rerun()
-
-
 with chat_tab:
     st.subheader("Coaching conversation")
     st.caption(
         "Paste a message you're about to send, or describe what you need to "
-        "say. You get the rewrite, the reasons, and a score you can track."
+        "say. You get the rewrite, the reasons behind it, and a score."
     )
 
     if not st.session_state.messages:
@@ -496,7 +359,6 @@ with chat_tab:
                 json={
                     "message": prompt,
                     "session_id": st.session_state.session_id,
-                    "handle": st.session_state.handle or None,
                 },
             )
             if error:

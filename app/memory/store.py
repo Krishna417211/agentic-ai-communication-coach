@@ -131,7 +131,7 @@ class SessionStore:
             if overall_score is not None:
                 session.scores.append(overall_score)
             for issue in issues or []:
-                session.issue_counts[normalise_issue(issue)] += 1
+                session.issue_counts[_normalise_issue(issue)] += 1
 
             self._trim(session)
             return session
@@ -195,7 +195,7 @@ class SessionStore:
             del self._sessions[sid]
 
 
-def normalise_issue(issue: str) -> str:
+def _normalise_issue(issue: str) -> str:
     """Collapse specific findings into a stable label we can count."""
     lowered = issue.lower()
     buckets = [

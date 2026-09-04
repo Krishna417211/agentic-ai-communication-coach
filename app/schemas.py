@@ -160,14 +160,6 @@ class CoachRequest(BaseModel):
     audience: str | None = Field(
         default=None, description="Who the message is for, e.g. 'my manager'."
     )
-    handle: str | None = Field(
-        default=None,
-        max_length=32,
-        description=(
-            "Optional profile handle. Supply it to have this turn counted "
-            "towards long-term progress across sessions."
-        ),
-    )
 
 
 class AnalyzeRequest(BaseModel):

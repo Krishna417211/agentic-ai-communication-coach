@@ -1,29 +1,30 @@
-# Communication Coach — an agent that tracks whether you're actually improving
+# Communication Coach — an agent that tells you *why*, not just *what*
 
 **Repository:** <https://github.com/Krishna417200/agentic-ai-communication-coach>
 
-You can paste an awkward work message into any chatbot and get a better version
-back. What you cannot get is an answer to the question that actually matters:
-
-> *Am I getting better, or am I making the same mistake every week?*
+Paste an awkward work message into a chatbot and you get a better version back.
+You do not get told what was wrong with yours, how much better the new one
+actually is, or which habit you just repeated for the third time this session.
 
 Communication Coach is built for early-career professionals who want to stop
-sounding junior in writing. It rewrites the message in front of you — and it
-remembers every message before it, so it can tell you that you hedged in three
-of your last four emails, and that you have not hedged since.
+sounding junior in writing. It rewrites the message *and* shows its work:
 
 ```
-Your progress · krishna                          6 messages coached
+> hey boss i cant come in tomorrow, im sick. sorry for the inconvience
 
-  Latest 69/100   ↑12        Average 63.5        Best 70
-  improving (+12 since you started)
+  Score 69/100 → 83/100  (+14)
+  clarity 90 · tone 52 · grammar 97 · structure 50 · impact 54
 
-  🔧 Habits to work on          ✅ Habits you're fixing
-  · missing call to action 6x   · grammar errors — 3x early, now 0x
-  · insufficient detail 6x      · hedging language — 3x early, now 0x
+  What to change
+  · No explicit call to action — the reader won't know what to do
+  · Too short to carry context — the reader has to guess
+  · 2 mechanical errors ("im", "inconvience")
+
+  You have now opened three messages with an apology this session.
 ```
 
-That table is the product. Everything below it is the machinery that earns it.
+The score is computed in code, so the +14 is a real measurement rather than a
+number the model felt like emitting.
 
 ---
 
@@ -51,32 +52,18 @@ go wrong:
 
 - **Scores are computed in code, not asked of the model.** Word counts,
   readability, passive voice and hedge density are deterministic, so the same
-  message always scores the same and progress across weeks is comparable. The
+  message always scores the same and two drafts are genuinely comparable. The
   LLM gets those numbers as grounding and adds the commentary.
 - **Independent tools run concurrently.** Retrieval and diagnosis both read
   only your draft, so they start together; generation waits for both, and
   scoring waits for generation. The planner declares the dependencies and the
   orchestrator batches accordingly.
-- **It runs with no API key at all.** With no key the rule-based engine still
-  does intent routing, grammar, tone, scoring, rewriting and retrieval. The app
-  says so in the UI and in `/health` rather than silently degrading.
-
----
-
-## Two kinds of memory
-
-This is the distinction the product rests on:
-
-| | Short-term (`app/memory/store.py`) | Long-term (`app/memory/profile.py`) |
-|---|---|---|
-| Holds | the turns of *this* conversation | scores, intents, habit labels |
-| Lifetime | bounded window, 6h TTL | durable, SQLite |
-| Keyed by | session id | a handle you choose |
-| Stores your message text | yes, in memory only | **never** |
-
-Long-term memory is what lets the coach say *"hedging language — 3x early, now
-0x"*. It only ever stores derived signal: your actual words are never written
-to disk.
+- **Degraded output says so.** With no key the rule-based engine still does
+  intent routing, grammar, tone, scoring, rewriting and retrieval. And if a
+  provider *is* configured but its calls fail, every tool falls back and still
+  reports success — so the response carries a `degraded` flag and the UI leads
+  with a warning naming the provider. A working fallback is not a working
+  request.
 
 ---
 
@@ -85,7 +72,6 @@ to disk.
 ## Contents
 
 - [Why this is an agent, not a prompt](#why-this-is-an-agent-not-a-prompt)
-- [Two kinds of memory](#two-kinds-of-memory)
 - [Quick start](#quick-start)
 - [Architecture](#architecture)
 - [The agent pipeline](#the-agent-pipeline)
@@ -297,8 +283,6 @@ receives those numbers as grounding facts and adds qualitative commentary on top
 
 ## Memory
 
-See [Two kinds of memory](#two-kinds-of-memory) for why this is split in two.
-
 `app/memory/store.py` keeps short-term conversational memory per session:
 
 - A **bounded window** of recent turns (default 12); overflow is folded into a
@@ -311,15 +295,6 @@ See [Two kinds of memory](#two-kinds-of-memory) for why this is split in two.
 - **Flow state** for multi-turn features (an interview in progress).
 - **TTL eviction** (default 6h) so memory stays flat on a free-tier host.
 
-`app/memory/profile.py` keeps the part that has to outlive the conversation:
-
-- **Score history per handle**, so the trend line spans sessions and restarts.
-- **Habit counts**, bucketed through the same normaliser the session store
-  uses, so both views agree on what a habit is called.
-- **Fading habits** — a habit is only reported as improving once there are at
-  least 6 coached turns to split, because below that the claim is not honest.
-- **`forget(handle)`** deletes a profile outright, and writes fail soft: a
-  locked or read-only database must never cost the user their answer.
 
 The store is async-safe and sits behind three methods, so swapping it for Redis
 to support multiple workers is a contained change.
@@ -339,11 +314,6 @@ Base path: `/api/v1`. Interactive docs at `/docs`, OpenAPI at `/openapi.json`.
 | `POST` | `/api/v1/improve` | **Communication improvement** — rewrite + score delta |
 | `GET` | `/api/v1/history/{session_id}` | **Chat history** |
 | `DELETE` | `/api/v1/history/{session_id}` | Clear a session |
-| `GET` | `/api/v1/progress/{handle}` | **Long-term progress** — trend, habits, habits fading |
-| `DELETE` | `/api/v1/progress/{handle}` | Delete a profile's whole history |
-
-`POST /api/v1/coach` takes an optional `handle`. Send one and the turn is
-counted towards that profile; omit it and nothing is written to disk.
 
 ### Bonus endpoints
 
@@ -448,22 +418,18 @@ request:
 
 ## User interface
 
-`streamlit run ui/streamlit_app.py` — five tabs, named after what you came to
+`streamlit run ui/streamlit_app.py` — four tabs, named after what you came to
 do rather than after the tools that do it:
 
 - **💬 Coach** — the chat, with an expandable *"How the agent decided"* panel
   showing the detected intent and confidence, the plan, each tool's result and
   timing, and the knowledge base citations.
-- **📈 Your progress** — score trend, habits to work on, habits you're fixing,
-  and what you practise most. Needs a handle; empty until you set one.
 - **🔍 Analyze & rewrite** — diagnose a message, or rewrite it and see the
   score delta side by side.
 - **🎯 Interview prep** — mock interview with per-answer STAR feedback, plus
   question generation from an uploaded resume.
 - **⚙️ Under the hood** — live request, latency, tool and intent metrics.
 
-Set a **handle** in the sidebar to turn the chat into coaching: without one the
-agent can only react to the message in front of it.
 
 The UI holds no agent logic — it is an HTTP client, so what it shows is exactly
 what an API consumer gets. Point it elsewhere with `API_BASE_URL`.
@@ -517,7 +483,6 @@ the full list.
 | `GEMINI_MODEL` | `gemini-3.6-flash` | |
 | `LLM_TIMEOUT_SECONDS` | `45` | |
 | `LLM_MAX_RETRIES` | `2` | Exponential backoff on 429/5xx |
-| `PROFILE_DB_PATH` | `data/coach.db` | Long-term progress store (SQLite) |
 | `MEMORY_MAX_TURNS` | `12` | Turns kept before summarising |
 | `SESSION_TTL_SECONDS` | `21600` | 6 hours |
 | `LOG_LEVEL` | `INFO` | |
