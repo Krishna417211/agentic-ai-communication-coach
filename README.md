@@ -512,7 +512,7 @@ the full list.
 |---|---|---|
 | `LLM_PROVIDER` | `auto` | `auto`, `groq`, `gemini`, `heuristic` |
 | `GROQ_API_KEY` | — | Free tier at console.groq.com |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | |
 | `GEMINI_API_KEY` | — | Free tier at aistudio.google.com |
 | `GEMINI_MODEL` | `gemini-3.6-flash` | |
 | `LLM_TIMEOUT_SECONDS` | `45` | |

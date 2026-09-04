@@ -68,6 +68,19 @@ _DEFAULT_PLANS: dict[Intent, list[tuple[ToolName, str, bool]]] = {
     ],
 }
 
+#: Tools that read only the user's own draft and produce nothing a sibling step
+#: consumes. Anywhere one of these appears it can start immediately, so the
+#: LLM planner's output gets the same concurrency as the table above rather
+#: than being forced into a straight line.
+_INDEPENDENT_TOOLS: frozenset[ToolName] = frozenset(
+    {
+        ToolName.KNOWLEDGE_LOOKUP,
+        ToolName.GRAMMAR_CORRECTION,
+        ToolName.TONE_ANALYSIS,
+    }
+)
+
+
 _GOALS: dict[Intent, str] = {
     Intent.EMAIL_WRITING: "Produce an email the recipient will read and act on.",
     Intent.INTERVIEW_PRACTICE: "Turn the user's answer into one that would pass a real interview.",
@@ -230,7 +243,8 @@ Return JSON:
                 PlanStep(
                     tool=tool,
                     objective=str(raw.get("objective", ""))[:200],
-                    depends_on_previous=bool(steps),
+                    depends_on_previous=bool(steps)
+                    and tool not in _INDEPENDENT_TOOLS,
                 )
             )
 

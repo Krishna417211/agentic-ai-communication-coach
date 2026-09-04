@@ -499,3 +499,54 @@ class TestStepBatching:
 
     def test_empty_plan_produces_no_batches(self):
         assert _batch_steps([]) == []
+
+
+@pytest.mark.asyncio
+class TestLLMPlanBatching:
+    """A model-authored plan must get the same concurrency as the table."""
+
+    async def _plan_from(self, steps: list[dict]):
+        from app.schemas import IntentResult
+
+        # Keyed on a phrase unique to the planner prompt.
+        llm = FakeLLM(
+            responses={"Pick 1-4 tools": {"goal": "g", "steps": steps, "rationale": "r"}}
+        )
+        planner = CommunicationPlanner(llm, build_registry(), enable_rag=True)
+        return await planner.plan(
+            IntentResult(
+                intent=Intent.EMAIL_WRITING,
+                confidence=0.4,  # low enough to trigger the LLM planner
+                rationale="",
+                method="llm",
+            ),
+            "help me write this",
+            has_draft=True,
+            session=None,
+        )
+
+    async def test_independent_tools_are_not_forced_into_a_queue(self):
+        plan = await self._plan_from(
+            [
+                {"tool": "knowledge_lookup", "objective": "a"},
+                {"tool": "tone_analysis", "objective": "b"},
+                {"tool": "email_generation", "objective": "c"},
+            ]
+        )
+        assert plan.method == "llm"
+        assert [[s.tool.value for s in b] for b in _batch_steps(plan.steps)] == [
+            ["knowledge_lookup", "tone_analysis"],
+            ["email_generation"],
+        ]
+
+    async def test_a_generator_still_waits(self):
+        plan = await self._plan_from(
+            [
+                {"tool": "email_generation", "objective": "a"},
+                {"tool": "communication_scoring", "objective": "b"},
+            ]
+        )
+        assert [[s.tool.value for s in b] for b in _batch_steps(plan.steps)] == [
+            ["email_generation"],
+            ["communication_scoring"],
+        ]
