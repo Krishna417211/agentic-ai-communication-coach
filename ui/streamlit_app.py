@@ -158,6 +158,18 @@ def render_scores(score: dict, overall: int | None, *, caption: str = "") -> Non
 
 
 def render_coaching(payload: dict) -> None:
+    if payload.get("degraded"):
+        # A provider is configured but its calls failed, so every tool quietly
+        # served its deterministic fallback. Without this the reply looks
+        # completely normal and the user ships worse output unaware.
+        reason = payload.get("degraded_reason") or "the provider call failed"
+        st.warning(
+            f"**Reduced quality — the `{payload['provider']}` call failed, so "
+            f"this came from the offline engine.** You are seeing scaffolds "
+            f"and rules rather than written prose.\n\nReason: `{reason}`",
+            icon="⚠️",
+        )
+
     st.markdown(payload["coaching_message"])
 
     if payload.get("score"):
@@ -299,7 +311,12 @@ with st.sidebar:
                     st.caption(history["summary"])
 
     st.divider()
-    st.caption(f"API docs: {API_BASE}/docs")
+    # On a single-process host the API lives on loopback inside the container,
+    # so linking to it would hand the user a dead address.
+    if "127.0.0.1" in API_BASE or "localhost" in API_BASE:
+        st.caption("API runs in-process · see the repo for the OpenAPI schema")
+    else:
+        st.caption(f"API docs: {API_BASE}/docs")
 
 
 # ---------------------------------------------------------------------------

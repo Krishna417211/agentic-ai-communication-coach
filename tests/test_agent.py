@@ -244,6 +244,24 @@ class TestOrchestrator:
         assert response.improved_response
         assert "you never" not in response.improved_response.lower()
 
+    async def test_a_healthy_offline_run_is_not_flagged_degraded(self):
+        # No provider configured is a deliberate mode, not a failure.
+        agent = await self._agent()
+        response = await agent.run("help me write to my manager")
+        assert response.degraded is False
+        assert response.degraded_reason is None
+
+    async def test_a_failing_provider_is_reported_as_degraded(self):
+        # This is the deployed failure that looked healthy: every tool falls
+        # back and reports ok=True, so without the flag the response is
+        # indistinguishable from a good one.
+        agent = await self._agent(FakeLLM(fail=True))
+        response = await agent.run("help me write to my manager")
+
+        assert response.degraded is True
+        assert "outage" in (response.degraded_reason or "")
+        assert all(r.ok for r in response.tool_results)  # the trap it closes
+
     async def test_memory_persists_across_turns(self):
         agent = await self._agent()
         first = await agent.run("Help me write an email to my manager about a raise")

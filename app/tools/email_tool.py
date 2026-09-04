@@ -49,9 +49,13 @@ class EmailGenerationTool(Tool):
             # would be nonsense, so emit a structured scaffold instead.
             body, changes = _scaffold(ctx.user_message, greeting)
             subject = _derive_subject(ctx.goal or ctx.user_message)
+            # This runs both when no key is set and when a configured provider
+            # failed, so it must not assert a cause it cannot know. The reason
+            # is reported separately via the response's `degraded_reason`.
             note = (
-                "This is a fill-in scaffold, not a finished email — no LLM is "
-                "configured. Set GROQ_API_KEY or GEMINI_API_KEY for a full draft."
+                "This is a fill-in scaffold, not a finished email — it was "
+                "written without an LLM. Configure a working provider key for "
+                "a complete draft."
             )
 
         if not analyze_text(body).has_greeting:

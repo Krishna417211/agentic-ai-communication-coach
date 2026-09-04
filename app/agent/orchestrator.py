@@ -193,6 +193,18 @@ class CommunicationAgent:
             issues=synthesis.feedback,
         )
 
+        # A configured provider whose calls are all failing produces a response
+        # that looks healthy: every tool reports ok=True because the fallback
+        # succeeded. Surface that, or the caller silently ships worse output.
+        degraded_results = [
+            r for r in results if r.ok and r.output.get("degraded")
+        ]
+        degraded_reason = (
+            degraded_results[0].output.get("degraded_reason")
+            if degraded_results
+            else None
+        )
+
         duration_ms = round((time.perf_counter() - started) * 1000, 2)
         logger.info(
             "trace=%s completed tools=%s score=%s duration_ms=%.1f",
@@ -213,6 +225,8 @@ class CommunicationAgent:
             tool_results=results,
             knowledge_used=synthesis.citations,
             provider=self.llm.name,
+            degraded=bool(degraded_results),
+            degraded_reason=degraded_reason,
             duration_ms=duration_ms,
         )
 

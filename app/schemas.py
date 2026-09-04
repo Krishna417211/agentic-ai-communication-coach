@@ -114,6 +114,12 @@ class CoachingResponse(BaseModel):
     tool_results: list[ToolResult] = Field(default_factory=list)
     knowledge_used: list[str] = Field(default_factory=list)
     provider: str = "heuristic"
+    #: True when a provider is configured but at least one tool's LLM call
+    #: failed and fell back to the deterministic engine. Without this the
+    #: response looks identical to a healthy one and the caller has no way to
+    #: know the output is degraded.
+    degraded: bool = False
+    degraded_reason: str | None = None
     duration_ms: float = 0.0
     created_at: datetime = Field(default_factory=_now)
 
