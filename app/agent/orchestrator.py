@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 import time
@@ -21,6 +22,7 @@ from app.schemas import (
     Intent,
     IntentResult,
     Plan,
+    PlanStep,
     Role,
     ScoreBreakdown,
     ToolName,
@@ -125,28 +127,46 @@ class CommunicationAgent:
         )
 
         # --- 4. Tool selection + execution -------------------------------
+        # Steps the planner marked independent run together: retrieval and
+        # diagnosis both read only the user's own draft, so waiting for one
+        # before starting the other buys nothing but latency. Dependent steps
+        # start once the whole batch ahead of them has landed and published
+        # its artifacts, so each tool still sees every earlier output.
         results: list[ToolResult] = []
-        for step in plan.steps:
-            tool = self.registry.get(step.tool)
-            if tool is None:
-                logger.warning("trace=%s planned tool %s is not registered", trace_id, step.tool)
+        for batch in _batch_steps(plan.steps):
+            runnable = []
+            for step in batch:
+                tool = self.registry.get(step.tool)
+                if tool is None:
+                    logger.warning(
+                        "trace=%s planned tool %s is not registered", trace_id, step.tool
+                    )
+                    continue
+                runnable.append((step, tool))
+            if not runnable:
                 continue
 
-            result = await tool(ctx)
-            results.append(result)
-            logger.info(
-                "trace=%s tool=%s ok=%s duration_ms=%.1f",
-                trace_id, step.tool.value, result.ok, result.duration_ms,
-            )
+            if len(runnable) == 1:
+                batch_results = [await runnable[0][1](ctx)]
+            else:
+                batch_results = await asyncio.gather(
+                    *(tool(ctx) for _, tool in runnable)
+                )
 
-            if result.ok:
-                # Later steps see earlier outputs.
-                ctx.artifacts[step.tool.value] = result.output
-                if step.tool is ToolName.KNOWLEDGE_LOOKUP:
-                    ctx.knowledge = [
-                        {"title": p["title"], "content": p["content"]}
-                        for p in result.output.get("passages", [])
-                    ]
+            for (step, _), result in zip(runnable, batch_results):
+                results.append(result)
+                logger.info(
+                    "trace=%s tool=%s ok=%s duration_ms=%.1f",
+                    trace_id, step.tool.value, result.ok, result.duration_ms,
+                )
+                if result.ok:
+                    # Later batches see earlier outputs.
+                    ctx.artifacts[step.tool.value] = result.output
+                    if step.tool is ToolName.KNOWLEDGE_LOOKUP:
+                        ctx.knowledge = [
+                            {"title": passage["title"], "content": passage["content"]}
+                            for passage in result.output.get("passages", [])
+                        ]
 
         # --- 5. Feedback synthesis ---------------------------------------
         synthesis = await self.synthesizer.synthesize(
@@ -231,6 +251,23 @@ class CommunicationAgent:
             options=options or {},
         )
         return await tool(ctx)
+
+
+def _batch_steps(steps: list[PlanStep]) -> list[list[PlanStep]]:
+    """Group a plan into batches that may each run concurrently.
+
+    A step marked ``depends_on_previous`` closes the batch before it and opens
+    a new one; consecutive independent steps share a batch. Order within the
+    plan is preserved, so a plan with no independent steps degrades to exactly
+    the sequential behaviour it had before.
+    """
+    batches: list[list[PlanStep]] = []
+    for step in steps:
+        if not batches or step.depends_on_previous:
+            batches.append([step])
+        else:
+            batches[-1].append(step)
+    return batches
 
 
 _DRAFT_HINTS = (

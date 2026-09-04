@@ -6,7 +6,7 @@ import pytest
 
 from app.agent.extract import extract_all, extract_target_text, extract_target_tone
 from app.agent.intent import IntentDetector, classify_heuristic
-from app.agent.orchestrator import CommunicationAgent
+from app.agent.orchestrator import CommunicationAgent, _batch_steps
 from app.agent.planner import CommunicationPlanner
 from app.config import Settings
 from app.llm.base import extract_json
@@ -454,3 +454,48 @@ class TestApostropheHandling:
     def test_contraction_heavy_text_is_untouched(self):
         message = "I can't tell if it's rude, don't you think they're being harsh?"
         assert extract_target_text(message) == ""
+
+
+class TestStepBatching:
+    """Independent plan steps must be grouped so they can run concurrently."""
+
+    def _plan(self, intent: Intent, *, has_draft: bool = True):
+        planner = CommunicationPlanner(
+            HeuristicProvider(), build_registry(), enable_rag=True
+        )
+        return planner.rule_based_plan(intent, has_draft=has_draft)
+
+    def _names(self, intent: Intent, *, has_draft: bool = True):
+        plan = self._plan(intent, has_draft=has_draft)
+        return [[s.tool.value for s in batch] for batch in _batch_steps(plan.steps)]
+
+    def test_retrieval_and_diagnosis_share_a_batch(self):
+        # Both read only the user's draft, so neither has to wait for the other.
+        assert self._names(Intent.EMAIL_WRITING) == [
+            ["knowledge_lookup", "grammar_correction"],
+            ["email_generation"],
+            ["communication_scoring"],
+        ]
+
+    def test_generation_waits_for_everything_before_it(self):
+        batches = self._names(Intent.CONFLICT_RESOLUTION)
+        assert batches[0] == ["knowledge_lookup", "tone_analysis"]
+        assert batches[1] == ["conversation_improvement"]
+
+    def test_fully_sequential_plan_is_unchanged(self):
+        # A plan with no independent steps must degrade to one step per batch.
+        assert self._names(Intent.GRAMMAR_CORRECTION) == [
+            ["grammar_correction"],
+            ["communication_scoring"],
+        ]
+
+    def test_first_surviving_step_never_depends_on_a_filtered_predecessor(self):
+        # With no draft, grammar/tone steps are filtered out. Whatever survives
+        # first must open a batch rather than wait on a step that never ran.
+        for intent in Intent:
+            plan = self._plan(intent, has_draft=False)
+            if plan.steps:
+                assert plan.steps[0].depends_on_previous is False
+
+    def test_empty_plan_produces_no_batches(self):
+        assert _batch_steps([]) == []

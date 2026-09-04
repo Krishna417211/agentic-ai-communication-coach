@@ -9,6 +9,7 @@ from fastapi import Depends, Request
 from app.agent.orchestrator import CommunicationAgent
 from app.config import Settings, get_settings
 from app.llm.base import LLMProvider
+from app.memory.profile import ProfileStore
 from app.memory.store import SessionStore
 
 
@@ -18,6 +19,10 @@ def get_agent(request: Request) -> CommunicationAgent:
 
 def get_memory(request: Request) -> SessionStore:
     return request.app.state.memory
+
+
+def get_profiles(request: Request) -> ProfileStore:
+    return request.app.state.profiles
 
 
 def get_llm(request: Request) -> LLMProvider:
@@ -30,6 +35,7 @@ def get_trace_id(request: Request) -> str:
 
 AgentDep = Annotated[CommunicationAgent, Depends(get_agent)]
 MemoryDep = Annotated[SessionStore, Depends(get_memory)]
+ProfilesDep = Annotated[ProfileStore, Depends(get_profiles)]
 LLMDep = Annotated[LLMProvider, Depends(get_llm)]
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 TraceDep = Annotated[str, Depends(get_trace_id)]

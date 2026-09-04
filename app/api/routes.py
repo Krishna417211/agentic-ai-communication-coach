@@ -8,7 +8,8 @@ import uuid
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
-from app.api.deps import AgentDep, MemoryDep, SettingsDep, TraceDep
+from app.api.deps import AgentDep, MemoryDep, ProfilesDep, SettingsDep, TraceDep
+from app.memory.store import normalise_issue
 from app.nlp.grammar import check_grammar
 from app.nlp.scoring import score_text
 from app.nlp.textstats import analyze_text
@@ -56,7 +57,7 @@ MAX_RESUME_BYTES = 5 * 1024 * 1024
     ),
 )
 async def coach(
-    payload: CoachRequest, agent: AgentDep, trace_id: TraceDep
+    payload: CoachRequest, agent: AgentDep, profiles: ProfilesDep, trace_id: TraceDep
 ) -> CoachingResponse:
     response = await agent.run(
         payload.message,
@@ -65,6 +66,14 @@ async def coach(
         audience=payload.audience,
         trace_id=trace_id,
     )
+    if payload.handle:
+        # Long-term memory: only the derived signal, never the message itself.
+        await profiles.record(
+            payload.handle,
+            intent=response.intent.intent.value,
+            overall_score=response.overall_score,
+            issues=[normalise_issue(f) for f in response.feedback],
+        )
     metrics.record_intent(response.intent.intent.value)
     metrics.record_llm_call(response.provider)
     for result in response.tool_results:
@@ -181,6 +190,24 @@ async def history(session_id: str, memory: MemoryDep) -> HistoryResponse:
         average_score=snapshot.average_score,
         turns=snapshot.turns,
     )
+
+
+@router.get(
+    "/progress/{handle}",
+    summary="Long-term progress for a profile",
+    description=(
+        "Score trend, recurring habits and habits that are fading, aggregated "
+        "across every session this handle has had."
+    ),
+)
+async def progress(handle: str, profiles: ProfilesDep) -> dict:
+    return await profiles.progress(handle)
+
+
+@router.delete("/progress/{handle}", summary="Delete a profile's history")
+async def forget_progress(handle: str, profiles: ProfilesDep) -> dict:
+    removed = await profiles.forget(handle)
+    return {"handle": handle, "removed": removed}
 
 
 @router.delete("/history/{session_id}", summary="Clear a session")

@@ -20,47 +20,51 @@ from app.tools.base import ToolRegistry
 logger = logging.getLogger(__name__)
 
 # What a coach does for each intent, in order.
-_DEFAULT_PLANS: dict[Intent, list[tuple[ToolName, str]]] = {
+#: Each entry is (tool, objective, depends_on_previous). ``False`` means the
+#: step needs nothing the earlier steps produce, so the orchestrator may run it
+#: concurrently with its neighbours. Retrieval and diagnosis both read only the
+#: user's own draft; generation needs them; scoring needs what generation wrote.
+_DEFAULT_PLANS: dict[Intent, list[tuple[ToolName, str, bool]]] = {
     Intent.EMAIL_WRITING: [
-        (ToolName.KNOWLEDGE_LOOKUP, "Pull email best-practice guidance."),
-        (ToolName.GRAMMAR_CORRECTION, "Clean up mechanics in the user's draft."),
-        (ToolName.EMAIL_GENERATION, "Draft the email end to end."),
-        (ToolName.COMMUNICATION_SCORING, "Score the draft and quantify the improvement."),
+        (ToolName.KNOWLEDGE_LOOKUP, "Pull email best-practice guidance.", False),
+        (ToolName.GRAMMAR_CORRECTION, "Clean up mechanics in the user's draft.", False),
+        (ToolName.EMAIL_GENERATION, "Draft the email end to end.", True),
+        (ToolName.COMMUNICATION_SCORING, "Score the draft and quantify the improvement.", True),
     ],
     Intent.INTERVIEW_PRACTICE: [
-        (ToolName.KNOWLEDGE_LOOKUP, "Retrieve interview-answer principles."),
-        (ToolName.INTERVIEW_COACHING, "Review the answer or generate practice questions."),
-        (ToolName.COMMUNICATION_SCORING, "Score delivery and structure."),
+        (ToolName.KNOWLEDGE_LOOKUP, "Retrieve interview-answer principles.", False),
+        (ToolName.INTERVIEW_COACHING, "Review the answer or generate practice questions.", True),
+        (ToolName.COMMUNICATION_SCORING, "Score delivery and structure.", True),
     ],
     Intent.GRAMMAR_CORRECTION: [
-        (ToolName.GRAMMAR_CORRECTION, "Find and fix every mechanical error."),
-        (ToolName.COMMUNICATION_SCORING, "Score the text so the user sees the impact."),
+        (ToolName.GRAMMAR_CORRECTION, "Find and fix every mechanical error.", False),
+        (ToolName.COMMUNICATION_SCORING, "Score the text so the user sees the impact.", True),
     ],
     Intent.TONE_IMPROVEMENT: [
-        (ToolName.TONE_ANALYSIS, "Diagnose how the current tone reads."),
-        (ToolName.CONVERSATION_IMPROVEMENT, "Rewrite toward the target tone."),
-        (ToolName.COMMUNICATION_SCORING, "Score before and after."),
+        (ToolName.TONE_ANALYSIS, "Diagnose how the current tone reads.", False),
+        (ToolName.CONVERSATION_IMPROVEMENT, "Rewrite toward the target tone.", True),
+        (ToolName.COMMUNICATION_SCORING, "Score before and after.", True),
     ],
     Intent.PUBLIC_SPEAKING: [
-        (ToolName.KNOWLEDGE_LOOKUP, "Retrieve presentation and delivery guidance."),
-        (ToolName.CONVERSATION_IMPROVEMENT, "Rewrite the script for the ear."),
-        (ToolName.COMMUNICATION_SCORING, "Score clarity and pacing for spoken delivery."),
+        (ToolName.KNOWLEDGE_LOOKUP, "Retrieve presentation and delivery guidance.", False),
+        (ToolName.CONVERSATION_IMPROVEMENT, "Rewrite the script for the ear.", True),
+        (ToolName.COMMUNICATION_SCORING, "Score clarity and pacing for spoken delivery.", True),
     ],
     Intent.CONFLICT_RESOLUTION: [
-        (ToolName.KNOWLEDGE_LOOKUP, "Retrieve de-escalation principles."),
-        (ToolName.TONE_ANALYSIS, "Identify phrasing that would escalate."),
-        (ToolName.CONVERSATION_IMPROVEMENT, "Rewrite using non-blaming language."),
-        (ToolName.COMMUNICATION_SCORING, "Score the rewritten message."),
+        (ToolName.KNOWLEDGE_LOOKUP, "Retrieve de-escalation principles.", False),
+        (ToolName.TONE_ANALYSIS, "Identify phrasing that would escalate.", False),
+        (ToolName.CONVERSATION_IMPROVEMENT, "Rewrite using non-blaming language.", True),
+        (ToolName.COMMUNICATION_SCORING, "Score the rewritten message.", True),
     ],
     Intent.CUSTOMER_COMMUNICATION: [
-        (ToolName.KNOWLEDGE_LOOKUP, "Retrieve customer-communication guidance."),
-        (ToolName.TONE_ANALYSIS, "Check empathy and blame language."),
-        (ToolName.CONVERSATION_IMPROVEMENT, "Rewrite for the customer."),
-        (ToolName.COMMUNICATION_SCORING, "Score the response."),
+        (ToolName.KNOWLEDGE_LOOKUP, "Retrieve customer-communication guidance.", False),
+        (ToolName.TONE_ANALYSIS, "Check empathy and blame language.", False),
+        (ToolName.CONVERSATION_IMPROVEMENT, "Rewrite for the customer.", True),
+        (ToolName.COMMUNICATION_SCORING, "Score the response.", True),
     ],
     Intent.GENERAL_COACHING: [
-        (ToolName.KNOWLEDGE_LOOKUP, "Find relevant coaching material."),
-        (ToolName.COMMUNICATION_SCORING, "Assess whatever the user provided."),
+        (ToolName.KNOWLEDGE_LOOKUP, "Find relevant coaching material.", False),
+        (ToolName.COMMUNICATION_SCORING, "Assess whatever the user provided.", False),
     ],
 }
 
@@ -104,7 +108,7 @@ class CommunicationPlanner:
 
     def rule_based_plan(self, intent: Intent, *, has_draft: bool) -> Plan:
         steps: list[PlanStep] = []
-        for tool_name, objective in _DEFAULT_PLANS.get(
+        for tool_name, objective, depends in _DEFAULT_PLANS.get(
             intent, _DEFAULT_PLANS[Intent.GENERAL_COACHING]
         ):
             if tool_name is ToolName.KNOWLEDGE_LOOKUP and not self._enable_rag:
@@ -124,7 +128,10 @@ class CommunicationPlanner:
                 PlanStep(
                     tool=tool_name,
                     objective=objective,
-                    depends_on_previous=bool(steps),
+                    # The first surviving step can never depend on a predecessor,
+                    # however the table declares it — earlier steps may have been
+                    # filtered out above.
+                    depends_on_previous=depends and bool(steps),
                 )
             )
 
