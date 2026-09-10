@@ -79,9 +79,18 @@ class GeminiProvider(LLMProvider):
             try:
                 response = await self._client.post(
                     url,
+                    params={"key": self._api_key},
                     json=payload,
                     headers={"x-goog-api-key": self._api_key},
                 )
+                if 400 <= response.status_code < 500 and response.status_code != 429:
+                    try:
+                        err_msg = response.json().get("error", {}).get("message")
+                    except Exception:
+                        err_msg = response.text[:200]
+                    raise LLMError(
+                        f"Gemini request failed ({response.status_code}): {err_msg or response.text[:200]}"
+                    )
                 if response.status_code == 429:
                     # Distinguish a burst rate-limit (worth a short retry) from
                     # an exhausted daily quota (not recoverable in-request —
