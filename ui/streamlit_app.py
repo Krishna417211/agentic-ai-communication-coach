@@ -27,6 +27,20 @@ import httpx
 import streamlit as st
 
 
+def _sync_streamlit_secrets() -> None:
+    """Copy Streamlit secrets into os.environ for FastAPI and Pydantic Settings."""
+    try:
+        if hasattr(st, "secrets"):
+            for k, v in st.secrets.items():
+                if isinstance(v, (str, int, float, bool)):
+                    str_val = str(v)
+                    os.environ[k] = str_val
+                    os.environ[k.upper()] = str_val
+                    os.environ[k.lower()] = str_val
+    except Exception:
+        pass
+
+
 def _port_is_open(host: str, port: int, timeout: float = 0.4) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(timeout)
@@ -48,7 +62,12 @@ def _start_embedded_api(port: int = 8000) -> str:
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
 
+    _sync_streamlit_secrets()
+
     import uvicorn
+
+    from app.config import get_settings
+    get_settings.cache_clear()
 
     from app.main import create_app
 
@@ -67,6 +86,7 @@ def _start_embedded_api(port: int = 8000) -> str:
 
 
 def _resolve_api_base() -> str:
+    _sync_streamlit_secrets()
     configured = os.getenv("API_BASE_URL")
     if configured:
         return configured.rstrip("/")
