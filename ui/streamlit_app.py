@@ -31,12 +31,17 @@ def _sync_streamlit_secrets() -> None:
     """Copy Streamlit secrets into os.environ for FastAPI and Pydantic Settings."""
     try:
         if hasattr(st, "secrets"):
-            for k, v in st.secrets.items():
-                if isinstance(v, (str, int, float, bool)):
-                    str_val = str(v)
-                    os.environ[k] = str_val
-                    os.environ[k.upper()] = str_val
-                    os.environ[k.lower()] = str_val
+            def _inject(d: Any) -> None:
+                for k, v in d.items():
+                    if isinstance(v, (str, int, float, bool)):
+                        str_val = str(v)
+                        os.environ[k] = str_val
+                        os.environ[k.upper()] = str_val
+                        os.environ[k.lower()] = str_val
+                    elif hasattr(v, "items"):
+                        _inject(v)
+
+            _inject(st.secrets)
     except Exception:
         pass
 
