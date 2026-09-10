@@ -24,6 +24,6 @@ class HeuristicProvider(LLMProvider):
         max_tokens: int | None = None,
     ) -> str:
         raise LLMError(
-            "No LLM configured. Set GROQ_API_KEY or GEMINI_API_KEY to enable "
+            "No LLM configured. Set GEMINI_API_KEY to enable "
             "generative features; rule-based analysis is still available."
         )

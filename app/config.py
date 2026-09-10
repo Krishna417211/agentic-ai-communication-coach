@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-Provider = Literal["auto", "groq", "gemini", "heuristic"]
+Provider = Literal["auto", "gemini", "heuristic"]
 
 
 class Settings(BaseSettings):
@@ -20,13 +20,9 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # --- LLM provider -------------------------------------------------
-    # "auto" picks the first provider that has credentials, then falls back
+    # "auto" uses Gemini if credentials are preset, then falls back
     # to the offline heuristic engine so the app always runs.
-    llm_provider: Provider = "auto"
-
-    groq_api_key: str | None = None
-    groq_model: str = "openai/gpt-oss-120b"
-    groq_base_url: str = "https://api.groq.com/openai/v1"
+    llm_provider: Provider = "gemini"
 
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.6-flash"

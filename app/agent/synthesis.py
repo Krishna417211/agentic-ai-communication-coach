@@ -208,8 +208,8 @@ Return JSON:
 
         if not self._llm.supports_generation:
             parts.append(
-                "\n---\n*Running in rule-based mode — set `GROQ_API_KEY` or "
-                "`GEMINI_API_KEY` for generated drafts and conversational coaching.*"
+                "\n---\n*Running in rule-based mode — set `GEMINI_API_KEY` "
+                "for generated drafts and conversational coaching.*"
             )
 
         return Synthesis(

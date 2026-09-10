@@ -8,10 +8,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Leave both keys unset to run the offline rule-based engine.
-      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      # Leave GEMINI_API_KEY unset to run the offline rule-based engine.
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}

@@ -22,8 +22,7 @@ Neither requires a credit card.
 
 | Provider | Console | Notes |
 |---|---|---|
-| **Groq** (recommended) | <https://console.groq.com/keys> | Fastest inference; default model `openai/gpt-oss-120b` |
-| **Google Gemini** | <https://aistudio.google.com/apikey> | Default model `gemini-3.6-flash` |
+| **Google Gemini** (recommended) | <https://aistudio.google.com/apikey> | Free tier; default model `gemini-3.6-flash` |
 
 The app deploys and runs without a key — it falls back to the rule-based engine
 — but generated drafts and conversational coaching need one.
@@ -56,7 +55,7 @@ configured.
    - **Plan:** Free
    - **Health check path:** `/health`
 4. Under **Environment**, add your key:
-   - `GROQ_API_KEY` = `gsk_...` (or `GEMINI_API_KEY`)
+   - `GEMINI_API_KEY` = `your_gemini_key_here`
    - `LOG_FILE` = *(empty)* — Render's disk is ephemeral, so log to stdout
 5. **Create Web Service**. First build takes 3-6 minutes.
 
@@ -80,7 +79,7 @@ If you create the service manually instead, the only required settings are:
 | Runtime | Docker |
 | Dockerfile path | `./Dockerfile` |
 | Health check path | `/health` |
-| `GROQ_API_KEY` *(or `GEMINI_API_KEY`)* | your key |
+| `GEMINI_API_KEY` | your key |
 | `LOG_FILE` | *(empty)* |
 
 Do **not** set `PORT` yourself — Render injects it, and the Dockerfile's
@@ -94,7 +93,7 @@ Do **not** set `PORT` yourself — Render injects it, and the Dockerfile's
 2. **New Project → Deploy from GitHub repo** → select your repository.
 3. Railway detects the Dockerfile automatically.
 4. **Variables** → add:
-   - `GROQ_API_KEY` = `gsk_...`
+   - `GEMINI_API_KEY` = `your_gemini_key_here`
    - `LOG_FILE` = *(empty)*
 5. **Settings → Networking → Generate Domain** to get a public URL.
 
@@ -192,7 +191,7 @@ Replace `$URL` with your public URL.
 ```bash
 # 1. Health — confirms the provider that was picked up
 curl $URL/health
-# {"status":"ok","version":"1.0.0","provider":"groq","llm_available":true,...}
+# {"status":"ok","version":"1.0.0","provider":"gemini","llm_available":true,...}
 
 # 2. Full agentic pipeline
 curl -X POST $URL/api/v1/coach \

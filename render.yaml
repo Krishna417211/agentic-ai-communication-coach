@@ -10,9 +10,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: LLM_PROVIDER
-        value: auto
-      - key: GROQ_API_KEY
-        sync: false        # set this in the Render dashboard
+        value: gemini
       - key: GEMINI_API_KEY
         sync: false
       - key: LOG_JSON

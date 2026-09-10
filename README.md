@@ -120,23 +120,18 @@ silently degrading.
 cp .env.example .env
 ```
 
-Then set **one** of these in `.env`:
+Then set your key in `.env`:
 
 | Provider | Free tier | Get a key |
 |---|---|---|
-| **Groq** (default, fastest) | Generous free tier, no card | <https://console.groq.com/keys> |
 | **Google Gemini** | Free tier, no card | <https://aistudio.google.com/apikey> |
 
 ```dotenv
 GEMINI_API_KEY=<your key>
 GEMINI_MODEL=gemini-3.6-flash
-# or
-GROQ_API_KEY=gsk_...
 ```
 
-`LLM_PROVIDER=auto` (the default) picks whichever key is present, preferring
-Groq, and falls back to the rule-based engine if neither is set. Set
-`LLM_PROVIDER=gemini` to pin it explicitly.
+`LLM_PROVIDER=gemini` (the default) uses Gemini, and falls back to the rule-based engine if no key is set.
 
 > **Note on Gemini 3.x:** these models reason before answering, and those
 > reasoning tokens are billed against `LLM_MAX_TOKENS`. The default of 3000
@@ -153,7 +148,7 @@ docker compose up --build
 API on `:8000`, UI on `:8501`. Pass keys through your shell or a `.env` file:
 
 ```bash
-GROQ_API_KEY=gsk_... docker compose up --build
+GEMINI_API_KEY=your_key docker compose up --build
 ```
 
 ---
@@ -183,7 +178,7 @@ GROQ_API_KEY=gsk_... docker compose up --build
             │       └───────────────┬───────────────┘        │
             ▼                       ▼                        ▼
     ┌────────────────────────────────────────────────────────────┐
-    │  LLM provider (Groq │ Gemini │ offline)  ·  SessionStore    │
+    │  LLM provider (Gemini │ offline)  ·  SessionStore           │
     │  NLP engine (app/nlp)  ·  KnowledgeBase (app/rag)           │
     └────────────────────────────────────────────────────────────┘
 ```
