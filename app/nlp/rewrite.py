@@ -97,8 +97,11 @@ _STRENGTHEN: list[tuple[str, str]] = [
 
 _TONE_PROFILES: dict[str, list[list[tuple[str, str]]]] = {
     "professional": [_HEDGE_REMOVALS, _JARGON_SWAPS, _FORMALISE],
+    "executive": [_HEDGE_REMOVALS, _JARGON_SWAPS, _STRENGTHEN, _FORMALISE],
+    "polite_firm": [_DE_ESCALATION, _HEDGE_REMOVALS, _SOFTEN, _FORMALISE],
     "formal": [_HEDGE_REMOVALS, _JARGON_SWAPS, _FORMALISE],
     "friendly": [_HEDGE_REMOVALS, _JARGON_SWAPS],
+    "warm": [_DE_ESCALATION, _SOFTEN],
     "empathetic": [_DE_ESCALATION, _JARGON_SWAPS, _SOFTEN],
     "diplomatic": [_DE_ESCALATION, _JARGON_SWAPS, _SOFTEN],
     "assertive": [_HEDGE_REMOVALS, _JARGON_SWAPS, _STRENGTHEN],
@@ -108,7 +111,9 @@ _TONE_PROFILES: dict[str, list[list[tuple[str, str]]]] = {
 }
 
 
-def rewrite(text: str, target_tone: str = "professional") -> tuple[str, list[str]]:
+def rewrite(
+    text: str, target_tone: str = "professional", *, is_email: bool = False
+) -> tuple[str, list[str]]:
     """Rewrite `text` toward `target_tone`. Returns (improved, changes)."""
     changes: list[str] = []
     working = text
@@ -151,20 +156,21 @@ def rewrite(text: str, target_tone: str = "professional") -> tuple[str, list[str
     if residual:
         working = apply_corrections(working, residual)
 
-    stats = analyze_text(working)
-    if not stats.has_call_to_action and stats.word_count > 20:
-        working = working.rstrip()
-        working += "\n\nCould you let me know by end of day Thursday whether that works?"
-        changes.append("Added an explicit call to action with a date.")
+    if is_email:
+        stats = analyze_text(working)
+        if not stats.has_call_to_action and stats.word_count > 20:
+            working = working.rstrip()
+            working += "\n\nPlease let me know if this works for you."
+            changes.append("Added a clear call to action.")
 
-    if not stats.has_greeting and stats.word_count > 30 and "\n" in text:
-        working = "Hi there,\n\n" + working
-        changes.append("Added a greeting.")
+        if not stats.has_greeting and stats.word_count > 30 and "\n" in text:
+            working = "Hi there,\n\n" + working
+            changes.append("Added a greeting.")
 
-    stats_after = analyze_text(working)
-    if not stats_after.has_signoff and stats_after.word_count > 40:
-        working = working.rstrip() + "\n\nThanks,\n"
-        changes.append("Added a sign-off.")
+        stats_after = analyze_text(working)
+        if not stats_after.has_signoff and stats_after.word_count > 40:
+            working = working.rstrip() + "\n\nThanks,\n"
+            changes.append("Added a sign-off.")
 
     if not changes:
         changes.append("No mechanical changes needed — the text was already clean.")

@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-Provider = Literal["auto", "gemini", "heuristic"]
+Provider = Literal["auto", "gemini", "groq", "openai", "openrouter", "ollama", "heuristic"]
 
 
 class Settings(BaseSettings):
@@ -20,18 +20,27 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # --- LLM provider -------------------------------------------------
-    # "auto" uses Gemini if credentials are preset, then falls back
-    # to the offline heuristic engine so the app always runs.
-    llm_provider: Provider = "gemini"
+    llm_provider: Provider = "auto"
 
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.6-flash"
+    gemini_model: str = "gemini-1.5-flash"
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta"
-    # Gemini 3.x reasons before answering, and those tokens are billed against
-    # max_tokens. "low" keeps the pipeline responsive (~3s vs ~12s per call)
-    # and is ample for classification and structured rewriting. Use "high" for
-    # more deliberation, or "" to send no thinkingConfig at all.
-    gemini_thinking_level: str = "low"
+    gemini_thinking_level: str = ""
+
+    groq_api_key: str | None = None
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    openai_base_url: str = "https://api.openai.com/v1"
+
+    openrouter_api_key: str | None = None
+    openrouter_model: str = "google/gemini-2.5-flash"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+
+    ollama_base_url: str = "http://localhost:11434/v1"
+    ollama_model: str = "llama3"
 
     llm_timeout_seconds: float = 45.0
     llm_max_retries: int = 2

@@ -38,7 +38,7 @@ class EmailGenerationTool(Tool):
 
         if ctx.target_text:
             # The user pasted a draft — transform it.
-            body, changes = rewrite(ctx.target_text, tone)
+            body, changes = rewrite(ctx.target_text, tone, is_email=True)
             subject = _derive_subject(ctx.goal or ctx.target_text)
             note = (
                 "Built by transforming your draft. Set an API key for a fully "

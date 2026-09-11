@@ -11,7 +11,7 @@ services:
       # Leave GEMINI_API_KEY unset to run the offline rule-based engine.
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.6-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_JSON: ${LOG_JSON:-true}
       ENVIRONMENT: docker

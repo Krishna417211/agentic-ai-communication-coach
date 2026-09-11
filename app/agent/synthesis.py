@@ -137,79 +137,84 @@ Return JSON:
         facts: "_Facts",
     ) -> Synthesis:
         topic = intent.intent.value.replace("_", " ")
+        target = ctx.target_text or ctx.user_message
+        
         parts: list[str] = [
-            f"**Coaching focus: {topic}** "
-            f"(intent confidence {intent.confidence:.0%}, "
-            f"tools run: {', '.join(r.tool.value for r in results if r.ok) or 'none'})"
+            f"### Coaching Analysis: {topic.title()}",
+            f"**Request / Draft:** *\"{target[:200]}{'...' if len(target) > 200 else ''}\"*",
         ]
 
         if facts.score:
             parts.append(
-                f"\n**Score: {facts.score.overall}/100** — "
-                f"clarity {facts.score.clarity}, tone {facts.score.tone}, "
-                f"grammar {facts.score.grammar}, structure {facts.score.structure}, "
-                f"impact {facts.score.impact}."
+                f"\n**Overall Communication Score: {facts.score.overall}/100**\n"
+                f"- Clarity: {facts.score.clarity}/100\n"
+                f"- Tone: {facts.score.tone}/100\n"
+                f"- Grammar & Mechanics: {facts.score.grammar}/100\n"
+                f"- Structure: {facts.score.structure}/100\n"
+                f"- Impact & Persuasion: {facts.score.impact}/100"
             )
             if facts.score_after and facts.score_after.overall != facts.score.overall:
                 delta = facts.score_after.overall - facts.score.overall
                 parts.append(
-                    f"The improved version scores {facts.score_after.overall}/100 "
-                    f"({delta:+d})."
+                    f"\n*The improved version boosts your overall score to **{facts.score_after.overall}/100** ({delta:+d} points).* "
                 )
 
         if facts.strengths:
-            parts.append("\n**What's working**")
+            parts.append("\n**Key Strengths**")
             parts.extend(f"- {s}" for s in facts.strengths[:4])
 
         if facts.weaknesses:
-            parts.append("\n**What to change**")
+            parts.append("\n**Areas for Improvement**")
             parts.extend(f"- {w}" for w in facts.weaknesses[:6])
 
         if facts.grammar_issues:
-            parts.append("\n**Grammar and mechanics**")
+            parts.append("\n**Grammar & Sentence Corrections**")
             for issue in facts.grammar_issues[:6]:
                 original = str(issue.get("original", ""))[:60]
                 suggestion = str(issue.get("suggestion", ""))[:60]
-                parts.append(f"- `{original}` → `{suggestion}` — {issue.get('message', '')}")
+                parts.append(f"- Original: `{original}` $\\rightarrow$ Suggested: `{suggestion}` ({issue.get('message', '')})")
 
         if facts.star_coverage:
-            missing = [k for k, v in facts.star_coverage.items() if not v]
-            covered = [k for k, v in facts.star_coverage.items() if v]
+            missing = [k.capitalize() for k, v in facts.star_coverage.items() if not v]
+            covered = [k.capitalize() for k, v in facts.star_coverage.items() if v]
             parts.append(
-                f"\n**STAR coverage:** {', '.join(covered) or 'none'} present"
-                + (f"; missing {', '.join(missing)}." if missing else ".")
+                f"\n**STAR Interview Method Coverage:**\n"
+                f"- Included components: {', '.join(covered) or 'None'}\n"
+                + (f"- Missing components to add: **{', '.join(missing)}**" if missing else "- Complete STAR structure!")
             )
 
         if facts.questions:
-            parts.append("\n**Practice questions**")
+            parts.append("\n**Recommended Practice Questions**")
             parts.extend(f"{i}. {q}" for i, q in enumerate(facts.questions[:6], 1))
 
         if facts.improved:
-            label = "Suggested email" if facts.subject else "Improved version"
+            label = "Suggested Email Draft" if facts.subject else "Improved Version"
             body = f"Subject: {facts.subject}\n\n{facts.improved}" if facts.subject else facts.improved
-            parts.append(f"\n**{label}**\n\n```\n{body}\n```")
+            parts.append(f"\n**{label}**\n\n```text\n{body}\n```")
 
         if facts.changes:
-            parts.append("\n**Changes made**")
+            parts.append("\n**Key Edits Made**")
             parts.extend(f"- {c}" for c in facts.changes[:6])
 
         if facts.knowledge_snippets:
-            parts.append("\n**From the coaching playbook**")
+            parts.append("\n**Best Practice Playbook**")
             for snippet in facts.knowledge_snippets[:2]:
                 first_para = snippet["content"].strip().split("\n\n")[0]
-                parts.append(f"- *{snippet['title']}* — {first_para[:280]}")
+                parts.append(f"- **{snippet['title']}**: {first_para[:280]}...")
 
         if ctx.session and ctx.session.recurring_issues():
             parts.append(
-                "\n**Pattern across this session:** "
+                "\n**Recurring Patterns in Session:** "
                 + "; ".join(ctx.session.recurring_issues())
-                + "."
             )
 
-        if not self._llm.supports_generation:
+        if not self._llm.supports_generation or getattr(self._llm, "name", "") == "heuristic":
             parts.append(
-                "\n---\n*Running in rule-based mode — set `GEMINI_API_KEY` "
-                "for generated drafts and conversational coaching.*"
+                "\n---\n*💡 **LLM Status**: Running offline rule-based fallback. Enter a valid API key (Gemini, Groq, OpenAI) in the sidebar under **⚙️ LLM Settings** for generative AI responses.*"
+            )
+        else:
+            parts.append(
+                "\n---\n*💡 **LLM Status**: Provider call used rule fallback due to rate-limit/quota. Check API key status in sidebar.*"
             )
 
         return Synthesis(

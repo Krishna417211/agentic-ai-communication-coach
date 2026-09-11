@@ -22,7 +22,7 @@ Neither requires a credit card.
 
 | Provider | Console | Notes |
 |---|---|---|
-| **Google Gemini** (recommended) | <https://aistudio.google.com/apikey> | Free tier; default model `gemini-3.6-flash` |
+| **Google Gemini** (recommended) | <https://aistudio.google.com/apikey> | Free tier; default model `gemini-2.5-flash` |
 
 The app deploys and runs without a key — it falls back to the rule-based engine
 — but generated drafts and conversational coaching need one.
@@ -122,7 +122,7 @@ to it over loopback, so one deployment gives you both the API and the UI.
 
    ```toml
    GEMINI_API_KEY = "your-key-here"
-   GEMINI_MODEL = "gemini-3.6-flash"
+   GEMINI_MODEL = "gemini-2.5-flash"
    LLM_PROVIDER = "gemini"
    LOG_FILE = ""
    ```

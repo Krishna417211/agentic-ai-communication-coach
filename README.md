@@ -128,7 +128,7 @@ Then set your key in `.env`:
 
 ```dotenv
 GEMINI_API_KEY=<your key>
-GEMINI_MODEL=gemini-3.6-flash
+GEMINI_MODEL=gemini-2.5-flash
 ```
 
 `LLM_PROVIDER=gemini` (the default) uses Gemini, and falls back to the rule-based engine if no key is set.
@@ -475,7 +475,7 @@ the full list.
 | `GROQ_API_KEY` | — | Free tier at console.groq.com |
 | `GROQ_MODEL` | `openai/gpt-oss-120b` | |
 | `GEMINI_API_KEY` | — | Free tier at aistudio.google.com |
-| `GEMINI_MODEL` | `gemini-3.6-flash` | |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | |
 | `LLM_TIMEOUT_SECONDS` | `45` | |
 | `LLM_MAX_RETRIES` | `2` | Exponential backoff on 429/5xx |
 | `MEMORY_MAX_TURNS` | `12` | Turns kept before summarising |

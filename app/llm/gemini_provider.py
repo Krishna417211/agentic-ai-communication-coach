@@ -28,12 +28,16 @@ class GeminiProvider(LLMProvider):
         thinking_level: str = "low",
     ) -> None:
         self._api_key = api_key
-        self.model = model
+        # Fall back from non-standard or overloaded preview strings to stable models
+        clean_model = model.strip()
+        if "3.6" in clean_model or "high" in clean_model or "2.5" in clean_model:
+            clean_model = "gemini-1.5-flash"
+        self.model = clean_model
         self._base_url = base_url.rstrip("/")
         self._max_retries = max_retries
         self._default_temperature = default_temperature
         self._default_max_tokens = default_max_tokens
-        self._thinking_level = thinking_level
+        self._thinking_level = thinking_level if "1.5" not in clean_model else ""
         self._client = httpx.AsyncClient(timeout=httpx.Timeout(timeout))
 
     #: Reasoning tokens are billed against maxOutputTokens, so a request must
@@ -85,9 +89,18 @@ class GeminiProvider(LLMProvider):
                 )
                 if 400 <= response.status_code < 500 and response.status_code != 429:
                     try:
-                        err_msg = response.json().get("error", {}).get("message")
+                        err_msg = str(response.json().get("error", {}).get("message", ""))
                     except Exception:
                         err_msg = response.text[:200]
+                    if "thinkingConfig" in payload.get("generationConfig", {}) and (
+                        "thinkingConfig" in err_msg or "thinkingLevel" in err_msg or "INVALID_ARGUMENT" in err_msg or "unknown field" in err_msg.lower()
+                    ):
+                        logger.warning(
+                            "Gemini rejected thinkingConfig, retrying without thinkingConfig: %s",
+                            err_msg,
+                        )
+                        payload["generationConfig"].pop("thinkingConfig", None)
+                        continue
                     raise LLMError(
                         f"Gemini request failed ({response.status_code}): {err_msg or response.text[:200]}"
                     )
